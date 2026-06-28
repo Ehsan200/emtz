@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Timezone Spoofer — Options</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <h1>Per-Domain Timezone Spoofer</h1>
+
+  <div id="warn" class="warn hidden">
+    <strong>User scripts disabled.</strong>
+    Open <code>chrome://extensions</code> → this extension → <em>Details</em> →
+    enable <strong>“Allow user scripts”</strong>, then reload this page.
+  </div>
+
+  <p class="hint">
+    Enter a base domain (e.g. <code>example.com</code>). It matches that domain
+    and all subdomains (<code>app.example.com</code>, <code>a.b.example.com</code>).
+    Changes take effect immediately — matching open tabs auto-reload.
+  </p>
+
+  <form id="add-form" class="row">
+    <input id="domain" type="text" placeholder="example.com" autocomplete="off" spellcheck="false" required>
+    <input id="tz" list="tz-options" placeholder="Search timezone…" autocomplete="off" spellcheck="false" required>
+    <button type="submit">Add</button>
+  </form>
+
+  <datalist id="tz-options"></datalist>
+
+  <table id="rules-table">
+    <thead>
+      <tr><th>Domain (+ subdomains)</th><th>Timezone</th><th></th></tr>
+    </thead>
+    <tbody id="rules-body"></tbody>
+  </table>
+  <p id="empty" class="hint hidden">No domains yet.</p>
+
+  <script src="options.js"></script>
+</body>
+</html>
