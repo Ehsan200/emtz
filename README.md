@@ -10,6 +10,9 @@ timezone you picked — without changing your system clock or affecting other si
 - **Per-domain timezone** — each domain gets its own IANA timezone (e.g. `app.work.com` → `Asia/Tokyo`, `news.site.io` → `Europe/London`).
 - **Subdomain matching** — adding `example.com` covers `example.com`, `app.example.com`, `a.b.example.com`, and any depth of subdomain.
 - **Full JS override** — patches `Date` (getters, setters, `toString`, `toLocale*`, constructor, `parse`), `Date.prototype.getTimezoneOffset`, and `Intl.DateTimeFormat` (default zone + `resolvedOptions`). UTC methods and `toISOString()` are left intact (correct behavior). DST transitions are handled.
+- **Matching locale** — a believable BCP-47 locale is auto-derived from the picked timezone (e.g. `Asia/Tokyo` → `ja-JP`) and applied to `navigator.language`, `navigator.languages`, and the default locale of every `Intl.*` constructor. Explicitly-requested locales (e.g. `new Intl.NumberFormat("de-DE")`) are left untouched. Unknown zones leave the language alone.
+- **Worker coverage** — `Worker` and `SharedWorker` are wrapped so the same timezone + locale override is injected into worker globals before the real worker script runs. iframes are covered too (`allFrames`).
+- **Anti-detection** — all patched functions report `[native code]` via a masked `Function.prototype.toString`, and constructor names (`Date`, `DateTimeFormat`, `Worker`) are preserved, so a site cannot trivially detect the override. All reported values (offset, zone name, `Intl` zone, `toString`) are internally consistent.
 - **Injected before page scripts** — runs in the page's MAIN world at `document_start`, so the site never sees the real timezone.
 - **Live updates** — changing the config re-applies immediately and auto-reloads any matching open tabs.
 - **Searchable timezone picker** — type to filter the full IANA timezone list.
@@ -75,6 +78,10 @@ new Date().getTimezoneOffset(); // offset of your chosen zone, in minutes
 new Date().toString();          // e.g. "... GMT+0900 (Japan Standard Time)"
 Intl.DateTimeFormat().resolvedOptions().timeZone; // your chosen zone
 window.__tzSpoofApplied;        // your chosen zone (proof the patcher ran)
+
+// detection-resistance: these should still look native
+Date.prototype.getTimezoneOffset.toString(); // "function getTimezoneOffset() { [native code] }"
+Date.name;                                    // "Date"
 ```
 
 > **Note:** The grey inline *preview chip* DevTools shows next to a `Date` is
@@ -87,9 +94,22 @@ window.__tzSpoofApplied;        // your chosen zone (proof the patcher ran)
 - **`chrome.userScripts` toggle required** — the only reliable way to inject
   dynamic MAIN-world code at `document_start` in MV3. Without it, nothing is
   injected.
-- **Web Workers are not patched** — `allFrames` covers iframes, but code running
-  in a dedicated/shared Web Worker has its own global scope and still sees the
-  real timezone.
+- **IP / network-based detection is out of scope** — this extension only changes
+  what the page's JavaScript reports. A site can still infer your real region
+  from your IP address (server-side geolocation), so for full location privacy
+  pair it with a VPN/proxy in the target region.
+- **Request headers are not modified** — `navigator.language` is spoofed in JS,
+  but the `Accept-Language` and `User-Agent` HTTP request headers still carry
+  your real values (server-side locale detection sees those). Header rewriting
+  would need `declarativeNetRequest` and is not included.
+- **Locale map is best-effort** — timezone→locale covers common zones; an
+  unrecognized zone keeps your real language rather than guessing wrong.
+- **Strict CSP `worker-src`** — if a site forbids `blob:` workers, the worker
+  wrapper falls back to creating the original (unpatched) worker so the site
+  keeps working; that worker then sees the real timezone. Main-thread/iframe
+  spoofing is unaffected.
+- **Worklets are not patched** — audio/paint/layout worklets run in restricted
+  globals that can't be wrapped this way (they rarely read the clock).
 - **Non-ISO timezone-less date strings** (e.g. `new Date("July 1 2026")`) fall
   back to native parsing. ISO-like strings without an offset (e.g.
   `"2026-07-01T12:00:00"`) are correctly interpreted in the target zone.
